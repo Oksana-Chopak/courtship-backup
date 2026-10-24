@@ -70,6 +70,15 @@ if [ -n "$DENO_BIN" ]; then
   else
     echo "❌ edge function type errors:"; grep -v "Download" /tmp/deno_check.txt | tail -30; echo ""; echo "🚫 Checks failed — do not deploy."; exit 1
   fi
+  # 3c. The watchdog, end to end against a fake world (pairing, hello, 🔴/🟢,
+  #     instant player errors, admin run-now) — scripts/watchdog-local.ts.
+  echo "→ Watchdog end-to-end (deno, fake Supabase + Telegram)…"
+  if "$DENO_BIN" run -A --no-config --no-lock --node-modules-dir=none $MAP_ARG scripts/watchdog-local.ts >/tmp/watchdog_e2e.txt 2>&1; then
+    echo "✅ watchdog e2e: $(grep -c '^✅' /tmp/watchdog_e2e.txt) steps"
+    [ -n "${CI:-}" ] && echo "::notice title=Watchdog::$(grep -c '^✅' /tmp/watchdog_e2e.txt) end-to-end steps green"
+  else
+    echo "❌ watchdog e2e failed:"; grep -v "Download" /tmp/watchdog_e2e.txt | tail -30; echo ""; echo "🚫 Checks failed — do not deploy."; exit 1
+  fi
 else
   echo "↷ edge functions: deno not found, skipped (install deno or run in CI)"
 fi

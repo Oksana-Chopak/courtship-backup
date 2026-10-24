@@ -1,0 +1,51 @@
+# Real-browser watch of production, every 30 minutes → Telegram on failure.
+#
+# WHERE THIS FILE GOES: .github/workflows/watch.yml
+# It lives here because the GitHub token used for pushes has no "workflow"
+# scope (GitHub refuses pushes that touch .github/workflows). Either:
+#   a) create a token with the Workflows permission (GitHub → Settings →
+#      Developer settings → Fine-grained tokens → this repo → Contents: read/write,
+#      Workflows: read/write) and put it in github-token.txt — then Claude moves it; or
+#   b) in GitHub: Add file → Create new file → name `.github/workflows/watch.yml`
+#      → paste this content → Commit.
+#
+# Secrets (GitHub → Settings → Secrets and variables → Actions):
+#   TELEGRAM_BOT_TOKEN   from @BotFather
+#   TELEGRAM_CHAT_ID     shown in Admin → Watchdog once paired
+#   WATCH_EMAIL / WATCH_PASSWORD   (optional) a member account used only by the watch
+name: Watch production
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # every half hour: speak only when something is broken
+    - cron: "5 6 * * *"      # once a day (~08:05 Stockholm): also say "all screens open"
+  workflow_dispatch:
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Open every screen on court-ship.com
+        id: watch
+        continue-on-error: true
+        env:
+          WATCH_EMAIL: ${{ secrets.WATCH_EMAIL }}
+          WATCH_PASSWORD: ${{ secrets.WATCH_PASSWORD }}
+        run: npm run -s watch:prod
+      - name: Tell Oksana (Telegram)
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          WATCH_ALWAYS_REPORT: ${{ (github.event.schedule == '5 6 * * *' || github.event_name == 'workflow_dispatch') && '1' || '0' }}
+        run: node scripts/watch-report.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: watch-results
+          path: watch-results
+          retention-days: 7

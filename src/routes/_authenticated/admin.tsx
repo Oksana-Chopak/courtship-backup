@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/lib/toast";
 import { useI18n } from "@/lib/i18n";
 import { AdminHealth } from "@/components/AdminHealth";
+import { AdminWatchdog } from "@/components/AdminWatchdog";
 import { AnnouncementAdmin } from "@/components/AnnouncementBanner";
 import { Collapsible } from "@/components/Collapsible";
 import { adminListCustomCourts, adminSetCourtHidden, adminUpdateCourt, shortCourtName, type AdminCourt } from "@/lib/courts";
@@ -319,6 +320,7 @@ function AdminPage() {
 
       {/* What broke / what works — first, always (Oxy 2026-10-06) */}
       <AdminHealth />
+      <AdminWatchdog />
 
       <AnnouncementAdmin />
 

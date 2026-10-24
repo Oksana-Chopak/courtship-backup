@@ -15,7 +15,9 @@
     "test:coverage": "vitest run --coverage && node scripts/coverage-gate.mjs",
     "test:mutation": "stryker run",
     "build:e2e": "NITRO_PRESET=node-server vite build --config vite.e2e.config.ts",
-    "test:e2e": "npm run build:e2e && playwright test"
+    "test:e2e": "npm run build:e2e && playwright test",
+    "watch:prod": "playwright test --config playwright.prod.config.ts",
+    "watch:report": "node scripts/watch-report.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

@@ -40,3 +40,4 @@ reports
 .stryker-tmp
 test-results
 playwright-report
+watch-results
