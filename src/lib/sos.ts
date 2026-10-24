@@ -1,4 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
+import { courtsById } from "@/lib/courtsCache";
 
 export type SosRow = {
   duration_min?: number;
@@ -241,13 +243,11 @@ export async function fetchMyUpcomingClaims(uid: string): Promise<EligibleSosRow
     .order("play_at", { ascending: true });
   const rows = (data as any[]) ?? [];
   if (!rows.length) return [];
-  const courtIds = Array.from(new Set(rows.map((r) => r.court_id).filter(Boolean)));
   const callerIds = Array.from(new Set(rows.map((r) => r.caller_id)));
-  const [{ data: cs }, { data: ps }] = await Promise.all([
-    (supabase as any).from("courts").select("id,name,city,area").in("id", courtIds.length ? courtIds : ["00000000-0000-0000-0000-000000000000"]),
+  const [courtMap, { data: ps }] = await Promise.all([
+    courtsById().catch(() => new Map()),
     (supabase as any).rpc("players_directory", { _ids: callerIds }),
   ]);
-  const courtMap = new Map<string, any>((cs as any[] | null)?.map((c) => [c.id, c]) ?? []);
   const callerMap = new Map<string, string>((ps as any[] | null)?.map((p) => [p.id, p.name]) ?? []);
   return rows.map((r) => ({
     ...r,
@@ -260,7 +260,7 @@ export async function fetchMyUpcomingClaims(uid: string): Promise<EligibleSosRow
 }
 
 export async function fetchMyActiveGames(): Promise<EligibleSosRow[]> {
-  const { data: u } = await supabase.auth.getUser();
+  const { data: u } = await getUserLocal();
   const uid = u?.user?.id;
   if (!uid) return [];
   const nowIso = new Date().toISOString();
@@ -276,11 +276,7 @@ export async function fetchMyActiveGames(): Promise<EligibleSosRow[]> {
     .order("play_at", { ascending: true });
   const rows = (data as any[]) ?? [];
   if (!rows.length) return [];
-  const courtIds = Array.from(new Set(rows.map((r) => r.court_id).filter(Boolean)));
-  const { data: cs } = await (supabase as any)
-    .from("courts").select("id,name,city,area")
-    .in("id", courtIds.length ? courtIds : ["00000000-0000-0000-0000-000000000000"]);
-  const courtMap = new Map<string, any>((cs as any[] | null)?.map((c) => [c.id, c]) ?? []);
+  const courtMap = await courtsById().catch(() => new Map());
   return rows.map((r) => ({
     ...r,
     court_name: courtMap.get(r.court_id)?.name ?? null,

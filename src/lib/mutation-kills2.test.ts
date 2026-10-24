@@ -41,7 +41,7 @@ vi.mock("@/integrations/supabase/client", () => {
         const o = outcome();
         return o instanceof Error ? Promise.reject(o) : Promise.resolve(o);
       },
-      auth: { getUser: async () => ({ data: { user: H.user } }) },
+      auth: { getUser: async () => ({ data: { user: H.user } }), getSession: async () => ({ data: { session: H.user ? { user: H.user } : null }, error: null }) },
     },
   };
 });

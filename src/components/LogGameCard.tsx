@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { logGame } from "@/lib/games";
 import { CourtCombobox } from "@/components/CourtCombobox";
 import { DateChipPicker } from "@/components/DateChipPicker";
@@ -49,7 +50,7 @@ export function LogGameCard({ defaultOpen = false, prefill, onSaved }: { default
   useEffect(() => {
     if (!open || players.length) return;
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       setMeId(u.user?.id ?? null);
       if (u.user && !prefill?.city) {
         const { data: p } = await (supabase as any).from("profiles").select("home_city").eq("id", u.user.id).maybeSingle();

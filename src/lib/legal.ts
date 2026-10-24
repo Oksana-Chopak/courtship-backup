@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 
 /** Bump when /privacy or /terms change in substance — users will be asked to
  *  re-accept via the ConsentGate. Keep in sync with the docs' version lines. */
@@ -11,7 +12,7 @@ export async function acceptTerms(): Promise<boolean> {
 
 /** null = profile not loaded/absent; otherwise whether the CURRENT version is accepted. */
 export async function fetchTermsAccepted(): Promise<boolean | null> {
-  const { data: au } = await supabase.auth.getUser();
+  const { data: au } = await getUserLocal();
   if (!au.user) return null;
   const { data, error } = await (supabase as any)
     .from("profiles")

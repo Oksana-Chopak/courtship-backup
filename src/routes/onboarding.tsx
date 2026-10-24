@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { consumeNext, rememberedInvite, forgetInvite } from "@/lib/share";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { emptyProfile, rowToProfile, type ProfileFormValues } from "@/components/ProfileWizard";
 import { QuickProfile } from "@/components/QuickProfile";
 import { toast } from "@/lib/toast";
@@ -70,7 +71,7 @@ function Onboarding() {
     // the own row (RLS-guarded) instead of widening the security-critical
     // save_my_profile RPC. Best-effort: an older DB without the columns just skips.
     try {
-      const { data: u2 } = await supabase.auth.getUser();
+      const { data: u2 } = await getUserLocal();
       if (u2.user) {
         // areas may not be migrated yet — retry without it so sports/goals
         // never get lost with it (supabase returns errors, it doesn't throw).
@@ -95,7 +96,7 @@ function Onboarding() {
     setBusy(true);
     let signupCode = "";
     try {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       signupCode =
         ((u.user?.user_metadata as any)?.signup_code as string | undefined) ||
         (typeof window !== "undefined" ? localStorage.getItem(SIGNUP_CODE_KEY) || "" : "") ||

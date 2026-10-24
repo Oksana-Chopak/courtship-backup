@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { useI18n } from "@/lib/i18n";
 import { Avatar } from "@/components/Avatar";
 import { SeasonPanel } from "@/components/SeasonPanel";
@@ -27,7 +28,7 @@ function MePage() {
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       const uid = u.user?.id;
       if (!uid) { setGuest(true); return; }
       setUid(uid);

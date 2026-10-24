@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { toast } from "@/lib/toast";
 import { oops } from "@/lib/oops";
 import { useI18n, LangToggle } from "@/lib/i18n";
@@ -25,7 +26,7 @@ function SettingsPage() {
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       if (!u.user) return;
       setUid(u.user.id);
       const { data } = await (supabase as any).rpc("get_my_full_profile").maybeSingle();
@@ -65,7 +66,7 @@ function SettingsPage() {
             const { error } = await (supabase as any).rpc("save_my_profile", { _data: v });
             if (!error) {
               try {
-                const { data: u2 } = await supabase.auth.getUser();
+                const { data: u2 } = await getUserLocal();
                 if (u2.user) {
                   // areas may not be migrated yet — retry without it so
                   // sports/goals never get lost with it.
@@ -178,7 +179,7 @@ function PrivacyDataSection() {
 
   useEffect(() => {
     void (async () => {
-      const { data: au } = await supabase.auth.getUser();
+      const { data: au } = await getUserLocal();
       if (!au.user) return;
       const { data } = await (supabase as any).from("profiles").select("public_preview").eq("id", au.user.id).maybeSingle();
       setPreview(data?.public_preview !== false);
@@ -188,7 +189,7 @@ function PrivacyDataSection() {
   async function togglePreview() {
     const next = !(preview ?? true);
     setPreview(next);
-    const { data: au } = await supabase.auth.getUser();
+    const { data: au } = await getUserLocal();
     if (!au.user) return;
     const { error } = await (supabase as any).from("profiles").update({ public_preview: next }).eq("id", au.user.id);
     if (error) { setPreview(!next); toast.error(t("privacyc.save_err")); }
@@ -290,7 +291,7 @@ function EmailNotifsToggle() {
 
   useEffect(() => {
     void (async () => {
-      const { data: au } = await supabase.auth.getUser();
+      const { data: au } = await getUserLocal();
       if (!au.user) return;
       const r = await (supabase as any).from("profiles").select("email_notifs,email_level,email_digest").eq("id", au.user.id).maybeSingle();
       if (r.error) {
@@ -309,7 +310,7 @@ function EmailNotifsToggle() {
   async function saveLevel(next: "all" | "important" | "off") {
     const prev = level;
     setLevel(next);
-    const { data: au } = await supabase.auth.getUser();
+    const { data: au } = await getUserLocal();
     if (!au.user) return;
     const patch: any = legacyOnly
       ? { email_notifs: next !== "off" }
@@ -322,7 +323,7 @@ function EmailNotifsToggle() {
   async function toggleDigest() {
     const next = !digest;
     setDigest(next);
-    const { data: au } = await supabase.auth.getUser();
+    const { data: au } = await getUserLocal();
     if (!au.user) return;
     const { error } = await (supabase as any).from("profiles").update({ email_digest: next }).eq("id", au.user.id);
     if (error) { setDigest(!next); toast.error(t("emailn.save_err")); }

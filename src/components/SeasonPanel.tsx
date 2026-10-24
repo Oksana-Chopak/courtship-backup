@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { fetchMyGameHistory } from "@/lib/games";
 import { activityTier, rescuerTier, recruiterTier, matchmakerTier, weeklyStreak, RANK_LADDERS, tierNameKey } from "@/lib/courtship";
 import { useI18n } from "@/lib/i18n";
@@ -61,7 +62,7 @@ export function SeasonPanel({ showShare = false }: { showShare?: boolean }) {
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       const uid = u.user?.id;
       if (!uid) return;
       const [profRes, hostedCount, hist] = await Promise.all([

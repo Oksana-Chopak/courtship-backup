@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { fetchMyGameHistory, type GameRow } from "@/lib/games";
 import { useI18n } from "@/lib/i18n";
 import { RF, clampLines } from "@/components/RailKit";
@@ -12,7 +13,7 @@ export function GamesHistory() {
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       if (!u.user) return;
       setMeId(u.user.id);
       const hist = await fetchMyGameHistory(u.user.id);

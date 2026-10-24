@@ -1,4 +1,3 @@
-import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 
@@ -20,13 +19,15 @@ if (typeof window !== "undefined") {
 }
 
 export const getRouter = () => {
-  const queryClient = new QueryClient();
-
   const router = createRouter({
     routeTree,
-    context: { queryClient },
+    context: {},
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
+    // A tab's code starts downloading on touch/hover, before the tap lands
+    // (2026-10-24 perf): the first switch to Players/Me no longer waits for a
+    // chunk round-trip on 4G.
+    defaultPreload: "intent",
   });
 
   return router;

@@ -18,6 +18,10 @@ export function Avatar({
       <img
         src={src}
         alt={name}
+        width={size}
+        height={size}
+        loading="lazy"
+        decoding="async"
         style={{ width: size, height: size }}
         className={`object-cover rounded-full border-2 border-[var(--ink)] ${className}`}
       />

@@ -11,7 +11,7 @@ const state: {
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    auth: { getUser: () => Promise.resolve({ data: { user: state.user } }) },
+    auth: { getUser: () => Promise.resolve({ data: { user: state.user } }), getSession: () => Promise.resolve({ data: { session: state.user ? { user: state.user } : null }, error: null }) },
     rpc: (...a: unknown[]) => state.rpc(...a),
     from: () => ({
       select: () => ({

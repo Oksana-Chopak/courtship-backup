@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { fetchCourtsForPicker, type CourtFull } from "@/lib/courts";
 import { LEVELS, DURATIONS, durationLabel, type City, sportMeta } from "@/lib/courtship";
 import { useCityNames } from "@/lib/cities";
@@ -60,7 +61,7 @@ function NewEvent() {
     (async () => {
       const cs = await fetchCourtsForPicker();
       setCourts(cs);
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       if (!u.user) { setReady(true); return; }
       const { data: p } = await supabase
         .from("profiles" as any)

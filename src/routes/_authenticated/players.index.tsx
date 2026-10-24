@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Rackets } from "@/components/RailKit";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { LEVELS, PLAY_TIMES, levelMeta, vibeEmoji, monogramColors, type City, sportMeta } from "@/lib/courtship";
 import { useCityNames } from "@/lib/cities";
 import { useI18n } from "@/lib/i18n";
@@ -58,7 +59,7 @@ function Players() {
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       const uid = u.user?.id ?? null;
       setMeId(uid);
       const [buddies, meRes, dirRes] = await Promise.all([
@@ -86,7 +87,7 @@ function Players() {
       setReqs((p) => p.filter((x) => x.id !== req.id));
       toast.success(accept ? t("buddy.accepted") : t("buddy.declined"));
       if (accept) {
-        const { data: u } = await supabase.auth.getUser();
+        const { data: u } = await getUserLocal();
         if (u.user) setBuddyIds(await fetchBuddyIds(u.user.id).catch(() => buddyIds));
       }
     } catch (e: any) { oops(e); }
@@ -259,7 +260,7 @@ function InviteAccent() {
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       const uid = u.user?.id;
       const [codeRes, profRes] = await Promise.all([
         (supabase as any).rpc("ensure_my_invite_code").then((r: any) => r, () => null),

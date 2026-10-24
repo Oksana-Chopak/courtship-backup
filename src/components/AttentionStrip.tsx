@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { fetchPendingPostGameChecks, confirmGame, reportNoshow, archiveGame, type GameRow } from "@/lib/games";
 import { toast } from "@/lib/toast";
 import { oops } from "@/lib/oops";
@@ -19,7 +20,7 @@ export function AttentionStrip({ onChange }: { onChange?: () => void }) {
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       if (!u.user) return;
       setMeId(u.user.id);
 

@@ -4,6 +4,7 @@ import { FLAGS } from "@/lib/flags";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { getProfilePhone } from "@/lib/whatsapp.functions";
 import { whatsappLink, levelMeta, monogramColors, sportMeta, vibeEmoji, waErrorKey } from "@/lib/courtship";
 import { BallHeart, Rackets, RF, clampLines } from "@/components/RailKit";
@@ -56,7 +57,7 @@ function MatchDeck() {
   useEffect(() => {
     (async () => {
       try {
-        const { data: u } = await supabase.auth.getUser();
+        const { data: u } = await getUserLocal();
         if (!u.user) return;
         const { data, error } = await (supabase as any).from("profiles").select("areas,goals").eq("id", u.user.id).maybeSingle();
         if (error || !data) return;

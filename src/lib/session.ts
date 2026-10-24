@@ -8,7 +8,23 @@
 // (revoked, reused, missing) is a sign-out; a network failure is "unsure", and
 // an unsure answer keeps the last member this tab saw signed in.
 
+import { supabase } from "@/integrations/supabase/client";
+
 type SessionClient = { auth: { getSession: () => Promise<{ data: { session: { user: any } | null } | null; error: { message?: string } | null }> } };
+
+/** Drop-in for `supabase.auth.getUser()` answered from the LOCAL session — same
+ *  `{ data: { user }, error }` shape, no round-trip to the auth server. 45 call
+ *  sites used getUser(); a board open made 8–9 such calls before anything
+ *  rendered (2026-10-24 perf probe). Keep the real getUser() only where
+ *  freshness matters (email confirmation polling, account withdrawal). */
+export async function getUserLocal(client: SessionClient = supabase as any): Promise<{ data: { user: any | null }; error: any | null }> {
+  try {
+    const { data, error } = await client.auth.getSession();
+    return { data: { user: data?.session?.user ?? null }, error: error ?? null };
+  } catch (e) {
+    return { data: { user: null }, error: e };
+  }
+}
 
 const DEAD_SESSION = /refresh[ _]?token|invalid|revoked|not[ _]?found|expired|missing/i;
 

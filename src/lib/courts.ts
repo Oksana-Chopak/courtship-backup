@@ -1,4 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
+import { invalidateCourts } from "@/lib/courtsCache";
 import type { CourtRow } from "@/lib/sos";
 
 export type CourtFull = CourtRow & {
@@ -19,7 +21,7 @@ export async function fetchCourtsForPicker(): Promise<CourtFull[]> {
 }
 
 export async function addCustomCourt(input: { name: string; area: string | null; city: string }): Promise<CourtFull> {
-  const { data: u } = await supabase.auth.getUser();
+  const { data: u } = await getUserLocal();
   if (!u.user) throw new Error("Not signed in");
   const { data, error } = await (supabase as any)
     .from("courts")
@@ -34,6 +36,7 @@ export async function addCustomCourt(input: { name: string; area: string | null;
     .select("id,name,area,city,is_custom,hidden,created_by")
     .single();
   if (error) throw new Error(error.message);
+  invalidateCourts(); // the board's court-name cache must see the new court at once
   return data as CourtFull;
 }
 

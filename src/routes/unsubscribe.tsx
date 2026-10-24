@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 
@@ -8,7 +7,7 @@ import { useI18n } from "@/lib/i18n";
  *  Linked from every email footer as /unsubscribe?token=… */
 export const Route = createFileRoute("/unsubscribe")({
   ssr: false,
-  validateSearch: z.object({ token: z.string().optional() }),
+  validateSearch: (s: Record<string, unknown>): { token?: string } => ({ token: typeof s.token === "string" && s.token ? s.token : undefined }),
   head: () => ({ meta: [{ title: "Unsubscribe — Courtship" }] }),
   component: UnsubscribePage,
 });

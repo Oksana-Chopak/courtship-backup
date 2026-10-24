@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 
 export type GameRow = {
   id: string;
@@ -77,7 +78,7 @@ export async function logGame(
 ): Promise<{ courtSaved: boolean; merged?: boolean }> {
   if (otherId) {
     try {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       const uid = u.user?.id;
       if (uid) {
         const same = findSameGame(await fetchPendingPostGameChecks(uid), uid, otherId, playedAtISO);

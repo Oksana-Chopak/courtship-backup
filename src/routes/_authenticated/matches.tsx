@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { LogGameCard, type LogPrefill } from "@/components/LogGameCard";
 import { GamesHistory } from "@/components/GamesHistory";
 import { useI18n } from "@/lib/i18n";
@@ -46,7 +47,7 @@ function MatchesPage() {
   useEffect(() => {
     (async () => {
       try {
-        const { data: u } = await supabase.auth.getUser();
+        const { data: u } = await getUserLocal();
         if (!u.user) return;
         const since = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
         const { data: sos } = await (supabase as any)

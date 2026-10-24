@@ -20,11 +20,12 @@ export const Route = createFileRoute("/")({
 function Index() {
   const { t } = useI18n();
   const navigate = useNavigate();
-  // While we figure out if there's already a session (e.g. the user just landed
-  // here from an email-confirmation link, which silently signs them in), hold
-  // off rendering the marketing landing so they don't see a "choose again"
-  // screen and get bounced straight into the app instead.
-  const [ready, setReady] = useState(false);
+  // The landing is SERVER-RENDERED for everyone (2026-10-24): a newcomer from a
+  // shared link sees the headline with the HTML, not after ~870 KB of JS. A
+  // visitor who is already signed in (or mid email-confirmation: token in the
+  // URL) is bounced into the app the moment the session is known; the page
+  // hides itself on the client as soon as that is decided, never on the server.
+  const [hidden, setHidden] = useState(false);
   // Live pulse under the headline: how many games are open right now. Never
   // advertises a zero — the line simply stays away on a quiet day.
   const [openGames, setOpenGames] = useState(0);
@@ -35,6 +36,7 @@ function Index() {
     const go = async (session: any) => {
       if (routed || !session) return;
       routed = true;
+      setHidden(true);
       if (!session.user.email_confirmed_at) {
         navigate({ to: "/check-email", search: { email: session.user.email ?? "" } });
         return;
@@ -51,24 +53,19 @@ function Index() {
       if (session) go(session);
     });
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        go(data.session);
-      } else {
-        // Could be mid-processing of a confirmation redirect (token still in the
-        // URL). Give SIGNED_IN a brief moment before falling back to the landing.
-        const authCallback =
-          typeof window !== "undefined" &&
-          (window.location.hash.includes("access_token") || window.location.search.includes("code="));
-        if (authCallback) setTimeout(() => { if (!routed) setReady(true); }, 1500);
-        else setReady(true);
-      }
-    });
+    // Mid email-confirmation (token still in the URL): hide the landing while
+    // supabase-js turns the token into a session, so nobody sees a "choose
+    // again" screen for a second; fall back to the landing if nothing comes.
+    const authCallback = typeof window !== "undefined" &&
+      (window.location.hash.includes("access_token") || window.location.search.includes("code="));
+    let fallback: ReturnType<typeof setTimeout> | undefined;
+    if (authCallback) { setHidden(true); fallback = setTimeout(() => { if (!routed) setHidden(false); }, 1500); }
+    supabase.auth.getSession().then(({ data }) => { if (data.session) go(data.session); });
 
-    return () => sub.subscription.unsubscribe();
+    return () => { sub.subscription.unsubscribe(); if (fallback) clearTimeout(fallback); };
   }, [navigate]);
 
-  if (!ready) return <div className="terry-bg min-h-screen" />;
+  if (hidden) return <div className="terry-bg min-h-screen" />;
 
   /* "Warm wash" home (TennisBuddies 10, variant B): real app icon as the logo,
      centered calm column, cities in wood under the subtitle, ONE pulsing coral

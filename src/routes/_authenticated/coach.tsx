@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { useI18n } from "@/lib/i18n";
 import { PLAY_TIMES, sportMeta } from "@/lib/courtship";
 import { toast } from "@/lib/toast";
@@ -26,7 +27,7 @@ function CoachPage() {
 
   async function load() {
     try {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       if (u.user) {
         const { data: p } = await (supabase as any).from("profiles").select("sports").eq("id", u.user.id).maybeSingle();
         const sp = ((p?.sports as string[] | null) ?? ["tennis"]);

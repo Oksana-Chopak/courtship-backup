@@ -1,7 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /** Resize an image File on the client. Returns a JPEG Blob ≤ maxDim on the long side. */
-export async function resizeImage(file: File, maxDim = 1200, quality = 0.85): Promise<Blob> {
+// 800 px is a full phone width at 2× — plenty for the dossier, and half the
+// bytes of the old 1200 px for every avatar on the board (2026-10-24 perf).
+export async function resizeImage(file: File, maxDim = 800, quality = 0.82): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
   const w = Math.round(bitmap.width * scale);

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { useI18n } from "@/lib/i18n";
 import { fetchMemberLinks, fetchMyTier, fetchSwishNumber, claimMembership, fetchMyClaims, type MemberLinks, type MemberTier, type MyClaim } from "@/lib/membership";
 import { toast } from "@/lib/toast";
@@ -48,7 +49,7 @@ function PlansPage() {
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       const uid = u.user?.id;
       const [l, mt, sw, cl] = await Promise.all([
         fetchMemberLinks(),

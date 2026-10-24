@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { useI18n } from "@/lib/i18n";
 import { BallHeart } from "@/components/RailKit";
 import { GameWizard } from "@/components/GameWizard";
@@ -24,7 +25,7 @@ function PostGamePage() {
 
   // Signed-in users get the full member wizard with their profile defaults.
   useEffect(() => {
-    void supabase.auth.getUser().then(({ data }: { data: { user: { id: string } | null } }) => {
+    void getUserLocal().then(({ data }: { data: { user: { id: string } | null } }) => {
       if (data.user) navigate({ to: "/sos/new", search: { edit: undefined }, replace: true });
     });
   }, [navigate]);

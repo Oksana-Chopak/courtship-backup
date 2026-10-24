@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { activeSosCount } from "@/lib/sos";
 import { notifyUsers } from "@/lib/push";
 import { fetchBuddyIds } from "@/lib/buddies";
@@ -48,7 +49,7 @@ export function GameWizard({ guest = false, editId }: { guest?: boolean; editId?
   useEffect(() => {
     (async () => {
       try {
-        const { data: u } = await supabase.auth.getUser();
+        const { data: u } = await getUserLocal();
         if (!u.user) return;
         const { data } = await (supabase as any).from("profiles").select("sports,is_admin").eq("id", u.user.id).maybeSingle();
         const sp = ((data?.sports as Sport[] | null) ?? ["tennis"]).filter((x): x is Sport => x === "tennis" || x === "padel" || x === "badminton");
@@ -81,7 +82,7 @@ export function GameWizard({ guest = false, editId }: { guest?: boolean; editId?
     (async () => {
       const cs = await fetchCourtsForPicker();
       setCourts(cs);
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       if (!u.user) {
         // Guest funnel: no profile to read — still default the court to the
         // first one in the default city so step 2 never starts empty.
@@ -246,7 +247,7 @@ export function GameWizard({ guest = false, editId }: { guest?: boolean; editId?
 
   useEffect(() => {
     void (async () => {
-      const { data: au } = await supabase.auth.getUser();
+      const { data: au } = await getUserLocal();
       if (!au.user) return;
       const { data } = await (supabase as any).from("profiles").select("is_admin").eq("id", au.user.id).maybeSingle();
       setIsAdmin(!!data?.is_admin);

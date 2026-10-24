@@ -9,6 +9,7 @@ const GATE = [
   "courtship.ts", "celebrate.ts", "draftGame.ts", "reasons.ts", "calendar.ts",
   "courts.ts", "guest.ts", "share.ts", "utils.ts", "cities.ts", "areas.ts",
   "session.ts", "authReturn.ts", // who is signed in / what Google handed back (2026-10-24)
+  "courtsCache.ts",              // one courts fetch per session (2026-10-24 perf)
 ];
 
 const summaryPath = "coverage/coverage-summary.json";

@@ -1,14 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/lib/toast";
 import { oops } from "@/lib/oops";
 import { useI18n } from "@/lib/i18n";
 
-const search = z.object({
-  email: z.string().optional().default(""),
-});
+const search = (s: Record<string, unknown>): { email: string } => ({ email: typeof s.email === "string" ? s.email : "" });
 
 export const Route = createFileRoute("/check-email")({
   validateSearch: search,

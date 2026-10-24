@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { useI18n } from "@/lib/i18n";
 import { fetchMyTier, type MemberTier } from "@/lib/membership";
 
@@ -15,7 +16,7 @@ export function MembershipCard() {
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       const uid = u.user?.id;
       if (!uid) { setLoaded(true); return; }
       const mt = await fetchMyTier(uid);

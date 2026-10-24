@@ -15,6 +15,7 @@ import {
 } from "@/lib/events";
 import { useI18n } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { copyText, myEventShareLink, shareMessage } from "@/lib/share";
 import { googleCalendarUrl } from "@/lib/calendar";
 import { TimeRail, RailShell, ShareIcon, Rackets, EditIcon, DeleteIcon, RF, clampLines } from "@/components/RailKit";
@@ -41,7 +42,7 @@ export function EventCard({ e, meId, myStatus, onChange, guest, focus }: { e: Ev
   }, [isHost, e.id, e.spots_taken]);
 
   async function join() {
-    const { data: u } = await supabase.auth.getUser();
+    const { data: u } = await getUserLocal();
     // Guest taps join on a SPECIFIC event — carry it through signup so the
     // board can finish the join on arrival (same promise the game path keeps).
     if (!u.user) { window.location.href = `/auth?mode=signup&next=${encodeURIComponent(`/board?join_event=${e.id}`)}`; return; }

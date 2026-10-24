@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { fetchMyGameHistory } from "@/lib/games";
 import { useI18n } from "@/lib/i18n";
 
@@ -11,7 +12,7 @@ export function CourtsPassport() {
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       if (!u.user) return;
       const hist = await fetchMyGameHistory(u.user.id, 200);
       const directIds = hist.map((g) => g.court_id).filter(Boolean) as string[];

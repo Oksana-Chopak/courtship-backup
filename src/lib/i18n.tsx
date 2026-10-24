@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 
 export type Lang = "en" | "sv";
 
@@ -2882,7 +2883,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     const load = async () => {
-      const { data } = await supabase.auth.getUser();
+      const { data } = await getUserLocal();
       if (!data.user || !active) return;
       const { data: p } = await supabase
         .from("profiles" as any)
@@ -2907,7 +2908,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(STORAGE_KEY, l); } catch {}
     // Best-effort persist to profile + auth metadata
     (async () => {
-      const { data } = await supabase.auth.getUser();
+      const { data } = await getUserLocal();
       if (!data.user) return;
       await supabase.from("profiles" as any).update({ lang: l }).eq("id", data.user.id).select("id");
       await supabase.auth.updateUser({ data: { lang: l } });

@@ -3,6 +3,7 @@ import { waErrorKey } from "@/lib/courtship";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { adminSetMember, type MemberTier } from "@/lib/membership";
 import { getProfilePhone } from "@/lib/whatsapp.functions";
 import { LEVELS, PLAY_TIMES, levelMeta, vibeEmoji, whatsappLink, sportMeta } from "@/lib/courtship";
@@ -37,7 +38,7 @@ function PlayerDetail() {
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       if (u.user) {
         setMeId(u.user.id);
         (supabase as any).rpc("get_my_full_profile").maybeSingle()

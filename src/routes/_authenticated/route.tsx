@@ -1,4 +1,5 @@
 import { BallHeart } from "@/components/RailKit";
+import { AppSkeleton } from "@/components/AppSkeleton";
 import { Avatar } from "@/components/Avatar";
 import { isStandalone } from "@/components/InstallBanner";
 import { createFileRoute, Outlet, redirect, Link, useLocation } from "@tanstack/react-router";
@@ -25,6 +26,10 @@ let profileConfirmed = false;
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
+  // Rendered by the server (and while beforeLoad runs): the app's frame instead
+  // of a blank screen for the seconds the JS needs on a phone (2026-10-24).
+  pendingComponent: AppSkeleton,
+  pendingMs: 0,
   beforeLoad: async ({ location }) => {
     const { user, unsure } = await sessionGate.currentUser(supabase as any);
     if (!user) {
@@ -43,28 +48,39 @@ export const Route = createFileRoute("/_authenticated")({
     if (!user.email_confirmed_at) {
       throw redirect({ to: "/check-email", search: { email: user.email ?? "" } });
     }
-    // A confirmed user WITHOUT a profile (abandoned onboarding, then a deep-link
-    // or push tap) would land on pages with a blank identity and could act with
-    // no name. Send them to finish onboarding. Cached so it costs one query per
-    // session, not one per navigation (a profile never un-exists). A query that
-    // FAILED proves nothing — never read a network error as "no profile".
-    if (!profileConfirmed && !unsure) {
-      const { data: prof, error } = await supabase.from("profiles" as any).select("id").eq("id", user.id).maybeSingle();
-      if (error) reportClientError("rpc", error, "shell: profile check");
-      else if (!prof) throw redirect({ to: "/onboarding" });
-      else profileConfirmed = true;
-    }
-    return { user };
+    // The "does this member have a profile?" check (abandoned onboarding, then
+    // a deep link) runs in the shell, off the critical path — see AuthedShell.
+    // It used to be awaited here: +0.5 s before anything rendered on a cold open.
+    return { user, unsure };
   },
   component: AuthedShell,
 });
 
 function AuthedShell() {
   const loc = useLocation();
-  const { user } = Route.useRouteContext();
+  const { user, unsure } = Route.useRouteContext() as { user: any; unsure?: boolean };
   const { t } = useI18n();
   const guest = !user;
   const mainRef = useRef<HTMLElement>(null);
+  const navigate = useNavigate();
+  // A confirmed user WITHOUT a profile (abandoned onboarding, then a deep-link
+  // or push tap) would land on pages with a blank identity and could act with
+  // no name. Send them to finish onboarding. One query per session, in parallel
+  // with the screen's own data (2026-10-24) — never on the critical path. A
+  // query that FAILED proves nothing: never read a network error as "no profile".
+  useEffect(() => {
+    if (guest || profileConfirmed || unsure) return;
+    let active = true;
+    void (async () => {
+      const { data: prof, error } = await supabase.from("profiles" as any).select("id").eq("id", user.id).maybeSingle();
+      if (!active) return;
+      if (error) reportClientError("rpc", error, "shell: profile check");
+      else if (!prof) navigate({ to: "/onboarding" });
+      else profileConfirmed = true;
+    })();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guest, user?.id]);
   // Invite landing: /board?code=<invite>&by=<first name> (myInviteLink). The code
   // is remembered on arrival, so it still reaches signup after the guest taps a
   // game, "+ Post a game" or another tab (Lovable scan 2026-10-16).
@@ -98,7 +114,6 @@ function AuthedShell() {
   // Reverse registration: a game drafted on /post (before the account existed)
   // publishes the moment its author lands in the authed shell — then we take
   // them straight to their live game so they can share it.
-  const navigate = useNavigate();
   useEffect(() => {
     if (guest || !user || !peekDraftGame()) return;
     void publishDraftGame(user.id).then((r) => {

@@ -95,6 +95,9 @@ if [ "${VERIFY_E2E:-}" != "0" ] && { [ -n "${CI:-}" ] || [ -n "${PW_CHROMIUM_PAT
     npx playwright install --with-deps chromium >/tmp/pw_install.txt 2>&1 || { echo "❌ playwright install failed:"; tail -20 /tmp/pw_install.txt; exit 1; }
   fi
   export HOST="${HOST:-127.0.0.1}"
+  # A server left running from an earlier build would be reused by Playwright
+  # and serve stale SSR against fresh chunks — every screen then fails at once.
+  (command -v fuser >/dev/null && fuser -k 4173/tcp >/dev/null 2>&1) || true
   if npm run -s build:e2e >/tmp/e2e_build.txt 2>&1 && npx playwright test >/tmp/e2e_out.txt 2>&1; then
     echo "✅ screens pass ($(grep -o '[0-9]* passed' /tmp/e2e_out.txt | tail -1))"
     SCREENS="$(grep -o '[0-9]* passed' /tmp/e2e_out.txt | tail -1)"

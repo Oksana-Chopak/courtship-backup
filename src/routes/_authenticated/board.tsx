@@ -10,6 +10,7 @@ import { fetchApprovedEvents, fetchMyAttendance, joinEvent, type EventRow } from
 import { reasonToast } from "@/lib/reasons";
 import { fetchPublicBoard, joinSearch } from "@/lib/guest";
 import { useCityNames } from "@/lib/cities";
+import { warmCourts } from "@/lib/courtsCache";
 import { EventCard } from "@/components/EventCard";
 import { googleCalendarUrl } from "@/lib/calendar";
 import { TimeRail, RailShell, RailPhoto, Rackets, ShareIcon, EditIcon, DeleteIcon, CalIcon, RF, clampLines, type RailTone } from "@/components/RailKit";
@@ -99,6 +100,7 @@ function BoardPage() {
     // After we know the user id, everything else only depends on it — fetch in
     // parallel instead of waterfalling. Each personal fetch degrades on its own
     // so one hiccup never blanks the board.
+    warmCourts(); // my games need court names: fetch them alongside, not after
     const profileQ = uid
       ? (supabase as any).from("profiles").select("home_city,games_played,rescues_count,referrals_count,photo_url,name,sports").eq("id", uid).maybeSingle().then((r: any) => r, () => null)
       : Promise.resolve(null);
@@ -108,19 +110,25 @@ function BoardPage() {
     const claimsQ = uid ? fetchMyUpcomingClaims(uid).catch(() => [] as any[]) : Promise.resolve([] as any[]);
     const myAppsQ = uid ? fetchMyApplicationSosIds(uid) : Promise.resolve(new Set<string>());
 
-    const [u, p, m, ev, att, profRes, hostedCount, claims, myApps] = await Promise.all([
+    // Stage 1 — what fills the list. Show the board the moment it arrives
+    // (names come with the RPC rows). Before 2026-10-24 the page waited for
+    // every personal query and three chained round-trips (~1 s on a phone)
+    // before the first card.
+    const [u, p, m, ev, att] = await Promise.all([
       fetchEligibleSos().catch(() => []), fetchOpenGames().catch(() => []), fetchMyActiveGames().catch(() => []),
       fetchApprovedEvents().catch(() => []), fetchMyAttendance().catch(() => ({} as Record<string, string>)),
-      profileQ, countQ, claimsQ, myAppsQ,
     ]);
-
-    // Enrich caller name+photo in one batch so cards can show host identity
+    setUrgent(u as EligibleSosRow[]); setPlanned(p as EligibleSosRow[]); setMine(m as EligibleSosRow[]); setEvents(ev); setMyAttendance(att);
+    setLoading(false);
+    // Stage 2 — the personal layers (started above, in parallel with stage 1).
+    const [profRes, hostedCount, claims, myApps] = await Promise.all([profileQ, countQ, claimsQ, myAppsQ]);
+    // Enrich caller photo + last name in one batch so cards can show host identity
     const hydrated = await hydrateCallers([...(u as EligibleSosRow[]), ...(p as EligibleSosRow[]), ...(m as EligibleSosRow[])]);
     const byId = new Map(hydrated.map((r) => [r.id, r]));
     const hU = (u as EligibleSosRow[]).map((r) => byId.get(r.id) ?? r);
     const hP = (p as EligibleSosRow[]).map((r) => byId.get(r.id) ?? r);
     const hM = (m as EligibleSosRow[]).map((r) => byId.get(r.id) ?? r);
-    setUrgent(hU); setPlanned(hP); setMine(hM); setEvents(ev); setMyAttendance(att);
+    setUrgent(hU); setPlanned(hP); setMine(hM);
     const prof = (profRes as any)?.data;
     if (prof) {
       setGamesPlayed(prof.games_played ?? 0);

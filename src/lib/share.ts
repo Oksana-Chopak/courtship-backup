@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { toast } from "@/lib/toast";
 
 const NEXT_KEY = "courtship.next";
@@ -71,7 +72,7 @@ export function forgetInvite(): void {
 async function myFirstName(): Promise<string> {
   // Stryker disable BlockStatement: an emptied catch returns undefined, which the caller truth-tests exactly like "" — identical link.
   try {
-    const { data: u } = await supabase.auth.getUser();
+    const { data: u } = await getUserLocal();
     // Stryker disable next-line OptionalChaining: a null user throws inside this try and lands in the same "" — observably identical.
     const uid = u.user?.id;
     if (!uid) return "";

@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { toast } from "@/lib/toast";
@@ -39,10 +38,13 @@ function authErrToast(t: (k: string) => string, err: any): void {
   else oops(err ?? new Error("auth_failed"));
 }
 
-const search = z.object({
-  mode: z.enum(["signup", "login"]).optional().default("signup"),
-  code: z.string().optional(),
-  next: z.string().optional(),
+// Hand-rolled (2026-10-24): zod was ~80 KB of the entry bundle for three
+// tiny search schemas; the router only needs a plain validating function.
+const str = (v: unknown): string | undefined => (typeof v === "string" && v ? v : undefined);
+const search = (s: Record<string, unknown>): { mode: "signup" | "login"; code?: string; next?: string } => ({
+  mode: s.mode === "login" ? "login" : "signup",
+  code: str(s.code),
+  next: str(s.next),
 });
 
 export const Route = createFileRoute("/auth")({

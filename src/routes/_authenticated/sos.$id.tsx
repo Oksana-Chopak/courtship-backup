@@ -3,6 +3,7 @@ import { waErrorKey } from "@/lib/courtship";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { getProfilePhone } from "@/lib/whatsapp.functions";
 import { googleCalendarUrl } from "@/lib/calendar";
 import { notifyUsers } from "@/lib/push";
@@ -79,7 +80,7 @@ function SosDetail() {
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       if (u.user) {
         const { data: p } = await supabase.from("profiles" as any).select("name").eq("id", u.user.id).maybeSingle();
         setMe({ id: u.user.id, name: (p as any)?.name ?? "" });

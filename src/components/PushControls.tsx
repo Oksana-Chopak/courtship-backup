@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "@/lib/toast";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { useI18n } from "@/lib/i18n";
 import { getPushStatus, subscribeToPush, unsubscribeFromPush, isPushSupported, type PushStatus } from "@/lib/push";
 
@@ -70,7 +71,7 @@ export function PushControls({ bare = false }: { bare?: boolean }) {
     setTestResult("");
     let msg = "";
     try {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       if (!u.user) { setBusy(false); return; }
       const { data, error } = await (supabase as any).functions.invoke("notify-users", {
         body: { user_ids: [u.user.id], title: "🎾 Courtship", body: t("push.test_body"), url: "/board", tag: "courtship-test" },

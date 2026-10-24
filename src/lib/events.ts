@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 
 export type EventRow = {
   id: string;
@@ -36,7 +37,7 @@ export async function createEventRequest(input: {
   description: string | null;
   contact: string | null;
 }): Promise<void> {
-  const { data: u } = await supabase.auth.getUser();
+  const { data: u } = await getUserLocal();
   if (!u.user) throw new Error("Not signed in");
   const { swish_number, contact, ...ev } = input;
   let res = await (supabase as any)
@@ -93,7 +94,7 @@ export async function setEventStatus(id: string, status: "approved" | "rejected"
 // ---- attendance ----
 
 export async function fetchMyAttendance(): Promise<Record<string, string>> {
-  const { data: u } = await supabase.auth.getUser();
+  const { data: u } = await getUserLocal();
   if (!u.user) return {};
   const { data } = await (supabase as any)
     .from("event_attendees")

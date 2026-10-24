@@ -1,6 +1,7 @@
-import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserLocal } from "@/lib/session";
 import { useI18n } from "@/lib/i18n";
 import { BallHeart } from "@/components/RailKit";
 import { FLAGS } from "@/lib/flags";
@@ -20,16 +21,26 @@ type Tab = {
  *  Court Crush can come back as a 4th tab with FLAGS.crushTab. */
 export function BottomTabBar({ guest = false }: { guest?: boolean } = {}) {
   const navigate = useNavigate();
+  const router = useRouter();
   const { t } = useI18n();
   const loc = useLocation();
   const path = loc.pathname;
+  // Once the current screen is up and the phone is idle, fetch the other tabs'
+  // code (a few KB each) so the first switch is instant (2026-10-24 perf).
+  useEffect(() => {
+    const go = () => { for (const to of ["/board", "/players", "/me"] as const) { if (!path.startsWith(to)) router.preloadRoute({ to }).catch(() => {}); } };
+    const w = window as any;
+    const id = typeof w.requestIdleCallback === "function" ? w.requestIdleCallback(go, { timeout: 4000 }) : setTimeout(go, 2500);
+    return () => { if (typeof w.cancelIdleCallback === "function") w.cancelIdleCallback(id); else clearTimeout(id); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [boardBadge, setBoardBadge] = useState(0);
   const [profileBadge, setProfileBadge] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     async function refresh() {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await getUserLocal();
       if (!u.user || cancelled) return;
       const [{ data: sos }, { data: reqs }] = await Promise.all([
         (supabase as any).rpc("eligible_sos_for_me"),
