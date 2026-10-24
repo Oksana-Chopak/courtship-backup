@@ -8,6 +8,7 @@ import fs from "node:fs";
 const GATE = [
   "courtship.ts", "celebrate.ts", "draftGame.ts", "reasons.ts", "calendar.ts",
   "courts.ts", "guest.ts", "share.ts", "utils.ts", "cities.ts", "areas.ts",
+  "session.ts", "authReturn.ts", // who is signed in / what Google handed back (2026-10-24)
 ];
 
 const summaryPath = "coverage/coverage-summary.json";

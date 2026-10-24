@@ -7,6 +7,13 @@ import { toast } from "@/lib/toast";
 import { oops } from "@/lib/oops";
 import { LangToggle, useI18n } from "@/lib/i18n";
 import { rememberNext, consumeNext, rememberInvite, rememberedInvite, forgetInvite } from "@/lib/share";
+import { parseOAuthReturn, stripOAuthHash, oauthErrorLine } from "@/lib/authReturn";
+import { reportClientError } from "@/lib/health";
+
+// The URL exactly as Google / Lovable's broker handed it back — read ONCE at
+// module load, before supabase-js (which clears the token hash while consuming
+// it) is ever touched. SSR has no window; the server never sees a hash anyway.
+const RETURN_URL = typeof window !== "undefined" ? { hash: window.location.hash, search: window.location.search } : null;
 
 /** Newcomers must not read raw Supabase strings ("Invalid login credentials")
  *  on their very first screen (2026-08-12 audit P1-12). Known codes map to
@@ -54,12 +61,16 @@ async function checkInvite(code: string) {
   return data === true;
 }
 
-async function userHasProfile(id: string) {
-  const { data } = await supabase
+/** true / false when the database answered; null on a network or server hiccup —
+ *  the caller must NOT send a member to onboarding on a null (2026-10-24: a
+ *  flaky connection used to look exactly like "no profile"). */
+async function userHasProfile(id: string): Promise<boolean | null> {
+  const { data, error } = await supabase
     .from("profiles" as any)
     .select("id")
     .eq("id", id)
     .maybeSingle();
+  if (error) { reportClientError("rpc", error, "auth: profile check"); return null; }
   return !!data;
 }
 
@@ -116,23 +127,43 @@ function AuthPage() {
 
   useEffect(() => {
     rememberNext(next);
-    const isRecovery = typeof window !== "undefined" && window.location.hash.includes("type=recovery");
+    const isRecovery = typeof window !== "undefined" && (RETURN_URL?.hash ?? window.location.hash).includes("type=recovery");
     if (isRecovery) setRecovery(true);
+    // Google (Lovable's broker) and Supabase land here with the outcome in the
+    // URL. A failure used to be invisible — the page simply showed the login
+    // form again. Now it is said out loud and lands in Admin → Health.
+    const ret = RETURN_URL ? parseOAuthReturn(RETURN_URL.hash, RETURN_URL.search) : { kind: "none" as const };
+    if (ret.kind === "error") {
+      const line = oauthErrorLine(ret);
+      reportClientError("shown", `oauth_return: ${line}`, `${RETURN_URL?.search ?? ""}${RETURN_URL?.hash ?? ""}`.slice(0, 600));
+      toast.error(t("auth.err_oauth", { detail: line }));
+      try { history.replaceState(null, "", window.location.pathname + window.location.search + stripOAuthHash(window.location.hash)); } catch { /* fine */ }
+    }
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") setRecovery(true);
     });
-    supabase.auth.getSession().then(async ({ data }) => {
+    supabase.auth.getSession().then(async ({ data, error }) => {
+      if (ret.kind === "tokens" && !data.session) {
+        // The broker DID hand over tokens and supabase-js still has no session:
+        // the one case that must never pass in silence.
+        reportClientError("shown", `oauth_return: tokens but no session${error ? ` — ${error.message}` : ""}`);
+        toast.error(t("auth.err_oauth", { detail: error?.message || "no session" }));
+        return;
+      }
       if (data.session && !isRecovery) {
         if (!data.session.user.email_confirmed_at) {
           navigate({ to: "/check-email", search: { email: data.session.user.email ?? "" } });
           return;
         }
         const has = await userHasProfile(data.session.user.id);
-        if (has) landOrBoard();
-        else navigate({ to: "/onboarding" });
+        // null = the check itself failed → go to the board; the shell re-checks
+        // on the next navigation instead of pushing a member into onboarding.
+        if (has === false) navigate({ to: "/onboarding" });
+        else landOrBoard();
       }
     });
     return () => { sub.subscription.unsubscribe(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
   // Returns the code to attach ("" = join without one), or null when signup
@@ -199,8 +230,8 @@ function AuthPage() {
           return;
         }
         const has = await userHasProfile(data.user.id);
-        if (has) landOrBoard();
-        else navigate({ to: "/onboarding" });
+        if (has === false) navigate({ to: "/onboarding" });
+        else landOrBoard();
       }
     } catch (err: any) {
       authErrToast(t, err);

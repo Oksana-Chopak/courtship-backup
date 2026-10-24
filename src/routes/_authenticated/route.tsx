@@ -8,6 +8,8 @@ import { BottomTabBar } from "@/components/BottomTabBar";
 import { ConsentGate } from "@/components/ConsentGate";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { ensurePushSubscribed } from "@/lib/push";
+import { reportClientError } from "@/lib/health";
+import { sessionGate } from "@/lib/session";
 import { FLAGS } from "@/lib/flags";
 import { useI18n } from "@/lib/i18n";
 import { joinSearch } from "@/lib/guest";
@@ -18,12 +20,14 @@ import { useNavigate } from "@tanstack/react-router";
 
 // Once we've seen this session's user has a profile, don't re-query on every nav.
 let profileConfirmed = false;
+// Who is signed in: the local session, never a per-navigation auth round-trip;
+// a network blip keeps the member in (src/lib/session.ts, 2026-10-24).
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async ({ location }) => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) {
+    const { user, unsure } = await sessionGate.currentUser(supabase as any);
+    if (!user) {
       // Guest peek: logged-out visitors may SEE the pulse on a few pages —
       // the live board is a better landing page than any landing page.
       const path = location.pathname.replace(/\/+$/, "") || "/";
@@ -36,19 +40,21 @@ export const Route = createFileRoute("/_authenticated")({
       // "I already have an account" link one tap away, and `next` survives it.
       throw redirect({ to: "/auth", search: { mode: "signup", next: location.href } });
     }
-    if (!data.user.email_confirmed_at) {
-      throw redirect({ to: "/check-email", search: { email: data.user.email ?? "" } });
+    if (!user.email_confirmed_at) {
+      throw redirect({ to: "/check-email", search: { email: user.email ?? "" } });
     }
     // A confirmed user WITHOUT a profile (abandoned onboarding, then a deep-link
     // or push tap) would land on pages with a blank identity and could act with
     // no name. Send them to finish onboarding. Cached so it costs one query per
-    // session, not one per navigation (a profile never un-exists).
-    if (!profileConfirmed) {
-      const { data: prof } = await supabase.from("profiles" as any).select("id").eq("id", data.user.id).maybeSingle();
-      if (!prof) throw redirect({ to: "/onboarding" });
-      profileConfirmed = true;
+    // session, not one per navigation (a profile never un-exists). A query that
+    // FAILED proves nothing — never read a network error as "no profile".
+    if (!profileConfirmed && !unsure) {
+      const { data: prof, error } = await supabase.from("profiles" as any).select("id").eq("id", user.id).maybeSingle();
+      if (error) reportClientError("rpc", error, "shell: profile check");
+      else if (!prof) throw redirect({ to: "/onboarding" });
+      else profileConfirmed = true;
     }
-    return { user: data.user };
+    return { user };
   },
   component: AuthedShell,
 });
