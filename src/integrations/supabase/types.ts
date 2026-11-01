@@ -1157,6 +1157,10 @@ export type Database = {
         Args: { _a: string; _b: string; _source: string }
         Returns: undefined
       }
+      _court_when: {
+        Args: { _city: string; _lang: string; _ts: string }
+        Returns: string
+      }
       _email_users: {
         Args: {
           _body: string
