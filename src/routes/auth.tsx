@@ -8,6 +8,7 @@ import { LangToggle, useI18n } from "@/lib/i18n";
 import { rememberNext, consumeNext, rememberInvite, rememberedInvite, forgetInvite } from "@/lib/share";
 import { parseOAuthReturn, stripOAuthHash, oauthErrorLine } from "@/lib/authReturn";
 import { reportClientError } from "@/lib/health";
+import { isInAppBrowser } from "@/lib/embeddedBrowser";
 
 // The URL exactly as Google / Lovable's broker handed it back — read ONCE at
 // module load, before supabase-js (which clears the token hash while consuming
@@ -109,6 +110,11 @@ function AuthPage() {
     setShowInvite(true);
   }, [code]);
   const [busy, setBusy] = useState(false);
+  // Instagram / Facebook / Messenger in-app browsers: Google blocks OAuth there
+  // (403 disallowed_useragent). Read after mount — the UA is not known during
+  // SSR, and reading it in render would break hydration (React #418).
+  const [inApp, setInApp] = useState(false);
+  useEffect(() => { setInApp(isInAppBrowser()); }, []);
   // Legal pack: sign-up requires an 18+ attestation and Terms/Privacy consent
   // (recorded server-side via accept_terms at the end of onboarding).
   const [legalAge, setLegalAge] = useState(false);
@@ -293,7 +299,11 @@ function AuthPage() {
           </p>
         </div>
 
-        {!isNativeShell() && <>
+        {inApp && !isNativeShell() && (
+          <p className="text-sm font-semibold text-center" style={{ opacity: 0.75 }}>{t("auth.inapp_email_hint")}</p>
+        )}
+
+        {!isNativeShell() && !inApp && <>
 
         <button
           type="button"
