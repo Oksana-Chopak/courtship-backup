@@ -150,11 +150,19 @@ async function run(trigger: "tick" | "run_now"): Promise<RunResult> {
     await setState(db, "heartbeat_day", hb.day);
   }
 
-  // a new build went live (chunk names changed) — one informative line
+  // a new build went live (chunk names changed) — one informative line, once:
+  // fingerprints seen in the last 24 h are remembered, so a CDN serving two
+  // builds for a few minutes (or a double Publish) never pages twice (2026-11-03).
   if (fingerprint) {
-    const prevBuild = await getState<string>(db, "build", "");
-    if (prevBuild && prevBuild !== fingerprint && chatId) { tg = await sendTelegram(db, chatId, formatBuildChange(nowIso)); if (tg.ok) sent.push("build"); }
-    if (prevBuild !== fingerprint) await setState(db, "build", fingerprint);
+    const seenBuilds = await getState<Record<string, string>>(db, "builds_seen", {});
+    const fresh: Record<string, string> = {};
+    for (const [fp, at] of Object.entries(seenBuilds)) if (now.getTime() - new Date(at).getTime() < 24 * 3600e3) fresh[fp] = at;
+    const known = Object.keys(fresh).length > 0;
+    if (!fresh[fingerprint]) {
+      fresh[fingerprint] = nowIso;
+      await setState(db, "builds_seen", fresh);
+      if (known && chatId) { tg = await sendTelegram(db, chatId, formatBuildChange(nowIso)); if (tg.ok) sent.push("build"); }
+    }
   }
 
   await setState(db, "last_run", {

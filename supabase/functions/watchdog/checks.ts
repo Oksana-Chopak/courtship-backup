@@ -33,7 +33,6 @@ export const CHECK_META: Record<string, { name: string; players: string; action:
   site_assets:  { name: "App code files",          players: "the app shows a blank screen after loading",   action: "Lovable → Publish → Update (files of the last deploy are missing)" },
   api_board:    { name: "Database: board",         players: "the board is empty or spinning forever",       action: "Lovable → Cloud → check the database is up; if it stays red 10 min, send this to Claude" },
   api_players:  { name: "Database: players",       players: "the players tab is empty",                     action: "same as the board" },
-  api_stats:    { name: "Database: counters",      players: "the landing page shows no numbers",            action: "same as the board" },
   auth_google:  { name: "Google sign-in (start)",  players: "“Continue with Google” fails or 404s",         action: "Lovable → Cloud → Users → Settings → Google must be ON (Managed by Lovable); then send this to Claude" },
   auth_settings:{ name: "Auth settings",           players: "Google is off or sign-ups are closed",         action: "Lovable → Cloud → Users → Settings: Google ON, sign-ups allowed" },
   fn:           { name: "Edge function",           players: "pushes/emails do not go out, buttons show an error", action: "Lovable chat: “Deploy the edge function <name> exactly as in the repo”" },
@@ -128,18 +127,33 @@ export async function checkRpc(fetchFn: Fetch, env: Env, id: string, name: strin
   }
 }
 
-/** “Continue with Google” — the first hop must send the browser to Google. */
+/** “Continue with Google” — the broker must hand the browser to Google. The
+ *  first hop may go through oauth.lovable.app; up to four redirects are
+ *  followed by hand, with a browser-like User-Agent (the broker is built for
+ *  browsers, not for Deno's default one). 2026-11-03: the first version only
+ *  accepted a direct 302 to accounts.google.com and rang false. */
+const BROWSER_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1 CourtshipWatchdog";
 export async function checkGoogleBroker(fetchFn: Fetch, site: string): Promise<Check> {
   const id = "auth_google";
-  const url = `${site}/~oauth/initiate?provider=google&redirect_uri=${encodeURIComponent(`${site}/auth`)}&state=watchdog`;
+  let url = `${site}/~oauth/initiate?provider=google&redirect_uri=${encodeURIComponent(`${site}/auth`)}&state=watchdog`;
+  const hops: string[] = [];
+  const t0 = Date.now();
   try {
-    const [r, ms] = await timed(() => get(fetchFn, url, { redirect: "manual" }));
-    const loc = r.headers.get("location") ?? "";
-    if (r.status >= 300 && r.status < 400 && /^https:\/\/accounts\.google\.com\//.test(loc)) return { id, ok: true, detail: `redirects to Google (${ms} ms)`, ms };
-    if (r.status >= 300 && r.status < 400) return fail(id, `redirects to ${loc.slice(0, 120) || "?"} instead of accounts.google.com`, ms);
-    return fail(id, `HTTP ${r.status}: ${(await r.text().catch(() => "")).slice(0, 160)}`, ms);
+    for (let i = 0; i < 5; i++) {
+      const r = await get(fetchFn, url, { redirect: "manual", headers: { "user-agent": BROWSER_UA, accept: "text/html,*/*" } });
+      const loc = r.headers.get("location") ?? "";
+      if (r.status >= 300 && r.status < 400 && loc) {
+        const next = new URL(loc, url).href;
+        hops.push(next.replace(/\?.*$/, ""));
+        if (/^https:\/\/accounts\.google\.com\//.test(next)) return { id, ok: true, detail: `reaches Google in ${hops.length} hop${hops.length === 1 ? "" : "s"} (${Date.now() - t0} ms)`, ms: Date.now() - t0 };
+        url = next;
+        continue;
+      }
+      return fail(id, `HTTP ${r.status} at ${url.replace(/\?.*$/, "")}${hops.length ? ` (after ${hops.join(" → ")})` : ""}: ${(await r.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 140)}`, Date.now() - t0);
+    }
+    return fail(id, `never reaches accounts.google.com: ${hops.join(" → ")}`, Date.now() - t0);
   } catch (e) {
-    return fail(id, `unreachable: ${String((e as Error)?.message ?? e)}`);
+    return fail(id, `unreachable: ${String((e as Error)?.message ?? e)}${hops.length ? ` (after ${hops.join(" → ")})` : ""}`);
   }
 }
 
@@ -225,7 +239,6 @@ export async function runChecks(fetchFn: Fetch, env: Env, facts: any, opts: { re
     site_auth: () => checkSite(fetchFn, "site_auth", `${site}/auth?mode=login`, [/Google/]),
     api_board: () => checkRpc(fetchFn, env, "api_board", "public_board"),
     api_players: () => checkRpc(fetchFn, env, "api_players", "public_players"),
-    api_stats: () => checkRpc(fetchFn, env, "api_stats", "community_stats"),
     auth_google: () => checkGoogleBroker(fetchFn, site),
     auth_settings: () => checkAuthSettings(fetchFn, env),
   };

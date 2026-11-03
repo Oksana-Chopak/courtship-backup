@@ -101,16 +101,30 @@ describe("api / auth / function checks", () => {
     expect(c.detail).toContain("HTTP 503");
     expect(c.detail).toContain("db down");
     const one = fakeFetch([{ match: () => true, res: () => jsonRes(200, { players: 3 }) }]);
-    expect((await checkRpc(one, ENV, "api_stats", "community_stats")).detail).toContain("(1 row)");
+    expect((await checkRpc(one, ENV, "api_players", "public_players")).detail).toContain("(1 row)");
     const boom = async () => { throw new Error("timeout"); };
     expect((await checkRpc(boom as any, ENV, "api_board", "public_board")).detail).toContain("unreachable: timeout");
   });
-  it("Google start: a redirect to accounts.google.com is the only green", async () => {
-    expect((await checkGoogleBroker(fakeFetch(healthy()), "https://court-ship.com")).ok).toBe(true);
-    const elsewhere = fakeFetch([{ match: () => true, res: () => res(302, "", { location: "https://court-ship.com/auth?error=legacy" }) }]);
-    expect((await checkGoogleBroker(elsewhere, "https://court-ship.com")).detail).toContain("instead of accounts.google.com");
+  it("Google start: reaching accounts.google.com — directly or via the broker's own hop — is green; loops, errors and dead ends are red", async () => {
+    const direct = await checkGoogleBroker(fakeFetch(healthy()), "https://court-ship.com");
+    expect(direct.ok).toBe(true);
+    expect(direct.detail).toContain("reaches Google in 1 hop");
+    const viaBroker = fakeFetch([
+      { match: (u) => u.includes("/~oauth/initiate"), res: () => res(302, "", { location: "https://oauth.lovable.app/authorize?x=1" }) },
+      { match: (u) => u.startsWith("https://oauth.lovable.app/"), res: () => res(302, "", { location: "https://accounts.google.com/v3/signin/identifier?client_id=1" }) },
+    ]);
+    const hop = await checkGoogleBroker(viaBroker, "https://court-ship.com");
+    expect(hop.ok).toBe(true);
+    expect(hop.detail).toContain("reaches Google in 2 hops");
+    const loop = fakeFetch([{ match: () => true, res: () => res(302, "", { location: "https://court-ship.com/auth?error=legacy" }) }]);
+    expect((await checkGoogleBroker(loop, "https://court-ship.com")).detail).toContain("never reaches accounts.google.com");
     const broken = fakeFetch([{ match: () => true, res: () => res(404, "not found") }]);
-    expect((await checkGoogleBroker(broken, "https://court-ship.com")).detail).toContain("HTTP 404");
+    expect((await checkGoogleBroker(broken, "https://court-ship.com")).detail).toContain("HTTP 404 at https://court-ship.com/~oauth/initiate");
+    const deadEnd = fakeFetch([
+      { match: (u) => u.includes("/~oauth/initiate"), res: () => res(302, "", { location: "https://oauth.lovable.app/authorize" }) },
+      { match: () => true, res: () => res(403, "disallowed") },
+    ]);
+    expect((await checkGoogleBroker(deadEnd, "https://court-ship.com")).detail).toContain("HTTP 403 at https://oauth.lovable.app/authorize (after https://oauth.lovable.app/authorize)");
     const boom = async () => { throw new Error("tls") };
     expect((await checkGoogleBroker(boom as any, "https://court-ship.com")).detail).toContain("unreachable: tls");
   });
@@ -194,7 +208,7 @@ describe("runChecks", () => {
     const { checks, fingerprint } = await runChecks(fakeFetch(healthy(), log), ENV, FACTS, noSleep);
     expect(checks.every((c) => c.ok)).toBe(true);
     expect(checks.map((c) => c.id).sort()).toEqual([
-      "api_board", "api_players", "api_stats", "auth_google", "auth_settings", "db_cron", "db_mail", "db_webhooks",
+      "api_board", "api_players", "auth_google", "auth_settings", "db_cron", "db_mail", "db_webhooks",
       ...DEFAULT_FUNCTIONS.map((f) => `fn_${f}`), "site_assets", "site_auth", "site_board", "site_event", "site_game", "site_home",
     ].sort());
     expect(log).toContain("GET https://court-ship.com/e/e1");
@@ -256,12 +270,12 @@ describe("memory + transitions", () => {
     expect(r2.memory).toEqual({});
   });
   it("a whole-API outage is one line, its children muted; the recovery lists them", () => {
-    const downs = [chk("api_board", false, "HTTP 503"), chk("api_players", false), chk("api_stats", false), chk("fn_sos-notify", false), chk("auth_settings", false), chk("site_home", false, "x")]
+    const downs = [chk("api_board", false, "HTTP 503"), chk("api_players", false), chk("fn_sos-notify", false), chk("auth_settings", false), chk("site_home", false, "x")]
       .map((check) => ({ type: "down" as const, check }));
     const g = groupOutage(downs);
     expect(g.map((e) => e.check.id)).toEqual(["api", "site_home"]);
     expect(g[0].check.detail).toContain("database/API unreachable — HTTP 503");
-    expect(groupOutage(downs.slice(0, 2)).length).toBe(2);
+    expect(groupOutage(downs.slice(0, 1)).length).toBe(1);
   });
 });
 

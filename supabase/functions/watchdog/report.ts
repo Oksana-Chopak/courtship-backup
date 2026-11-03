@@ -74,7 +74,7 @@ function humanDuration(min: number): string {
  *  recovery lists them all once. */
 export function groupOutage(downs: Extract<Event, { type: "down" }>[]): Extract<Event, { type: "down" }>[] {
   const api = downs.filter((e) => e.check.id.startsWith("api_"));
-  if (api.length < 3) return downs;
+  if (api.length < 2) return downs; // both public RPC probes down = the API itself
   const rest = downs.filter((e) => !e.check.id.startsWith("api_") && !e.check.id.startsWith("fn_") && e.check.id !== "auth_settings");
   return [{ type: "down", check: { id: "api", ok: false, detail: `database/API unreachable — ${api[0].check.detail}` } }, ...rest];
 }
